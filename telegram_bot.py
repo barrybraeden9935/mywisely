@@ -142,8 +142,10 @@ async def queue_balance_task(
         "additional_data": additional_data,
     }
 
-    ins = await sb.table("tasks").insert(payload).select("*").single().execute()
-    return ins.data
+    resp = await sb.table("tasks").insert(payload).execute()
+    data = resp.data or []
+    return data[0] if isinstance(data, list) and data else data
+
 
 async def queue_register_static(
     sb: Client,
@@ -185,8 +187,9 @@ async def queue_register_static(
             "additional_data": additional_data,
         }
 
-        ins = await sb.table("tasks").insert(payload).select("*").single().execute()
-        return ins.data
+        resp = await sb.table("tasks").insert(payload).execute()
+        data = resp.data or []
+        return data[0] if isinstance(data, list) and data else data
     except Exception:
         await emails_repo.set_used(selected_email, False)
         raise
