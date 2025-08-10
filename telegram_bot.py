@@ -378,6 +378,7 @@ async def cron_process_completed_tasks(context: ContextTypes.DEFAULT_TYPE):
     tasks_repo = TasksRepo(sb)
     bot = context.bot
 
+    logger.info(f"Running cron job")
     try:
         tasks = await tasks_repo.list_completed(limit=50)
         if not tasks:
