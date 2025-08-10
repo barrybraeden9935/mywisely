@@ -1,6 +1,6 @@
 # users.py
 from typing import Optional, Dict, Any
-from base import BaseRepo, Client
+from db.base import BaseRepo, Client
 
 class UsersRepo(BaseRepo):
     def __init__(self, sb: Client):

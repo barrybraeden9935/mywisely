@@ -1,6 +1,6 @@
 # tasks.py
 from typing import Optional, Dict, List, Union, Any
-from base import BaseRepo, Client
+from db.base import BaseRepo, Client
 
 Json = Union[dict, list, str, int, float, bool, None]
 
