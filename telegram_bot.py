@@ -25,7 +25,9 @@ for k, v in cfg.items():
     os.environ[k] = str(v)
     logger.debug(f"Loaded env var: {k}")
 
-ALT_GROUP_CHAT_ID = os.getenv("ALT_GROUP_CHAT_ID")  # optional high-balance alert chat
+# Always post results to MAIN group; if balance >= 100 also to TRANSFERS group
+MAIN_GROUP_CHAT_ID = int(os.getenv("MAIN_GROUP_CHAT_ID", "-4823975367"))
+TRANSFERS_GROUP_CHAT_ID = int(os.getenv("TRANSFERS_GROUP_CHAT_ID", "-4686276375"))
 
 # =========================
 # Parsing helpers
@@ -243,14 +245,12 @@ def _build_balance_message(
 
 def _register_successful(output: Any) -> bool:
     text = "" if output is None else str(output)
-    # simple broad success detector (tweak as needed)
     return bool(re.search(r"(success|registered\s+success)", text, re.I))
 
 # =========================
 # Cron processors (use repos)
 # =========================
 async def _create_user_from_register_task(sb: Client, task: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Create users row from REGISTER task additional_data; return user row."""
     users_repo = UsersRepo(sb)
     ad = task.get("additional_data") or {}
     form = ad.get("form") or {}
@@ -273,7 +273,6 @@ async def _create_user_from_register_task(sb: Client, task: Dict[str, Any]) -> O
         "banned": False,
         "profile_id": form.get("profile_id"),
     }
-    # strip None
     payload = {k: v for k, v in payload.items() if v is not None}
 
     try:
@@ -283,22 +282,33 @@ async def _create_user_from_register_task(sb: Client, task: Dict[str, Any]) -> O
         logger.error(f"Failed to create user from REGISTER task: {e}")
         return None
 
+async def _post_to_groups(bot, text: str, *, high_balance: bool) -> None:
+    # Always post to main group
+    try:
+        await bot.send_message(MAIN_GROUP_CHAT_ID, text)
+    except Exception as e:
+        logger.error(f"Failed to send to MAIN_GROUP_CHAT_ID={MAIN_GROUP_CHAT_ID}: {e}")
+
+    # Post to transfers group only on high balance
+    if high_balance:
+        try:
+            await bot.send_message(TRANSFERS_GROUP_CHAT_ID, text)
+        except Exception as e:
+            logger.error(f"Failed to send to TRANSFERS_GROUP_CHAT_ID={TRANSFERS_GROUP_CHAT_ID}: {e}")
+
 async def _process_balance_task(sb: Client, bot, task: Dict[str, Any]) -> None:
     emails_repo = EmailsRepo(sb)
     users_repo = UsersRepo(sb)
     tasks_repo = TasksRepo(sb)
 
-    chat_id = task.get("message_id")
     email = task.get("email")
     output = task.get("output") or ""
 
-    # lookups
     email_row = await emails_repo.get_by_email(email)
     user_row = await users_repo.get_by_email(email)
 
     if not user_row:
-        if chat_id:
-            await bot.send_message(chat_id, f"❌ User not found for email: {email}")
+        await _post_to_groups(bot, f"❌ User not found for email: {email}", high_balance=False)
         await tasks_repo.delete_by_id(task["id"])
         return
 
@@ -314,14 +324,9 @@ async def _process_balance_task(sb: Client, bot, task: Dict[str, Any]) -> None:
         raw_output=parsed["raw"],
     )
 
-    if chat_id:
-        await bot.send_message(chat_id, msg)
+    high = parsed["main_balance"] >= 100 or parsed["savings_balance"] >= 100
+    await _post_to_groups(bot, msg, high_balance=high)
 
-    # high balance alert
-    if ALT_GROUP_CHAT_ID and (parsed["main_balance"] >= 100 or parsed["savings_balance"] >= 100):
-        await bot.send_message(ALT_GROUP_CHAT_ID, msg)
-
-    # bad status -> ban
     if parsed["bad_status"]:
         await emails_repo.set_banned(email, True)
 
@@ -332,19 +337,14 @@ async def _process_register_task(sb: Client, bot, task: Dict[str, Any]) -> None:
     users_repo = UsersRepo(sb)
     tasks_repo = TasksRepo(sb)
 
-    chat_id = task.get("message_id")
     email = task.get("email")
     output = task.get("output") or ""
-
     parsed = _parse_balances(output)
 
     if _register_successful(output):
-        # create user row if not exists
         user_row = await users_repo.get_by_email(email)
         if not user_row:
             user_row = await _create_user_from_register_task(sb, task)
-
-        # mark email used = true
         await emails_repo.set_used(email, True)
 
         email_row = await emails_repo.get_by_email(email)
@@ -358,19 +358,13 @@ async def _process_register_task(sb: Client, bot, task: Dict[str, Any]) -> None:
             savings_balance=parsed["savings_balance"],
             raw_output=parsed["raw"],
         )
-        if chat_id:
-            await bot.send_message(chat_id, f"✅ Registered\n{msg}")
-
-        if ALT_GROUP_CHAT_ID and (parsed["main_balance"] >= 100 or parsed["savings_balance"] >= 100):
-            await bot.send_message(ALT_GROUP_CHAT_ID, f"✅ Registered\n{msg}")
+        await _post_to_groups(bot, f"✅ Registered\n{msg}", high_balance=(parsed["main_balance"] >= 100 or parsed["savings_balance"] >= 100))
 
         if parsed["bad_status"]:
             await emails_repo.set_banned(email, True)
     else:
-        # failed register -> free the email
-        if chat_id:
-            trimmed = (str(output)[:1800] + "…") if output and len(str(output)) > 1800 else str(output)
-            await bot.send_message(chat_id, f"❌ Failed to register email: {email}\n{trimmed}")
+        trimmed = (str(output)[:1800] + "…") if output and len(str(output)) > 1800 else str(output)
+        await _post_to_groups(bot, f"❌ Failed to register email: {email}\n{trimmed}", high_balance=False)
         await emails_repo.set_used(email, False)
 
     await tasks_repo.delete_by_id(task["id"])
@@ -415,17 +409,22 @@ async def on_startup(app):
     await app.bot.set_my_commands([
         BotCommand("get_balance", "Create balance_check task for an email"),
         BotCommand("register_static", "Create REGISTER task from a static form"),
+        BotCommand("ping", "Get ping")
     ])
     # schedule cron every minute
     app.job_queue.run_repeating(cron_process_completed_tasks, interval=60, first=10)
-    logger.info("Async Supabase client initialized, commands set, cron scheduled.")
+    logger.info(
+        f"Async Supabase client initialized, commands set, cron scheduled. "
+        f"MAIN_GROUP_CHAT_ID={MAIN_GROUP_CHAT_ID}, TRANSFERS_GROUP_CHAT_ID={TRANSFERS_GROUP_CHAT_ID}"
+    )
 
 async def get_balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("Usage: /get_balance {email}")
         return
     email = context.args[0].strip()
-    message_id = str(update.message.chat_id) if update.message else None  # chat_id preferred
+    # We still store the originating chat as message_id (optional), but cron posts to groups
+    message_id = str(update.message.chat_id) if update.message else None
 
     sb: Client = context.application.bot_data["sb"]
     try:
@@ -460,6 +459,9 @@ async def register_static_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.exception(f"/register_static error: {e}")
         await update.message.reply_text("❌ Failed to queue REGISTER task.")
 
+async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Pong")
+
 # =========================
 # Entry point
 # =========================
@@ -477,6 +479,7 @@ def main():
 
     app.add_handler(CommandHandler("get_balance", get_balance_cmd))
     app.add_handler(CommandHandler("register_static", register_static_cmd))
+    app.add_handler(CommandHandler("ping", ping))
 
     logger.info("Bot is running...")
     app.run_polling()
