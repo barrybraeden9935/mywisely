@@ -445,7 +445,7 @@ async def register_static_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(
             "Usage:\n/register_static\nfirst_name:John\nlast_name:Doe\ndob:01/01/1990\n"
             "street_address:...\ncity:...\nstate:...\nzip:...\nssn:...\ncard_number:...\n"
-            "card_expiry:MM/YY\ncvv:...\nproxyProvider:MOBILE1"
+            "card_expiry:MM/YY\ncvv:...\nproxyProvider:..."
         )
         return
 

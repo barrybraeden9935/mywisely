@@ -35,6 +35,9 @@ class BaseRepo:
         for k, v in filters.items():
             q = q.eq(k, v)
         res = await q.limit(1).maybe_single().execute()
+        if not res:
+            return None 
+            
         return res.data
 
     async def list(

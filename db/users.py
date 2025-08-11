@@ -17,14 +17,3 @@ class UsersRepo(BaseRepo):
 
     async def set_profile_id(self, id_: int, profile_id: str) -> Dict:
         return await self.update(id_, {"profile_id": profile_id})
-
-    async def _get_user_row_by_email(sb: Client, email: str) -> Optional[Dict[str, Any]]:
-        res = (
-            await sb.table("users")
-            .select("*")
-            .eq("email", email)
-            .limit(1)
-            .maybe_single()
-            .execute()
-        )
-        return res.data
