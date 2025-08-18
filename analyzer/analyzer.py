@@ -17,7 +17,8 @@ class Analyzer:
     def _load_model(self):
         logger.info("Loading YOLO model")
         try:
-            model_path = "best.pt"
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            model_path = os.path.join(script_dir, "best.pt")
             if not os.path.exists(model_path):
                 logger.error(f"Model file '{model_path}' not found")
                 raise FileNotFoundError(f"Model file '{model_path}' not found")
