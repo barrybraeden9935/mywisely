@@ -25,7 +25,6 @@ class BrowserInfo:
 
 
 class AdsPowerManager:
-    
     def __init__(self, api_url: str = "http://local.adspower.net:50325"):
         self.api_url = api_url
         self.proxy: Optional[ProxyConfig] = None
