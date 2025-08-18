@@ -14,7 +14,9 @@ dependencies = [
     "loguru>=0.7.3",
     "opencv-python>=4.12.0.88",
     "pillow>=10.4.0",
+    "pyautogui>=0.9.54",
     "requests>=2.28.0",
+    "supabase>=2.6.0",
     "ultralytics>=8.3.168",
 ]
 requires-python = ">=3.8"

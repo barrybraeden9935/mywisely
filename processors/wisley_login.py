@@ -1,10 +1,10 @@
 import os 
 import json 
 from adspower import AdsPowerManager
-from analyzer import Analyzer
+from analyzer.analyzer import Analyzer
 
 class WisleyLogin:
-    def __init__(self, rdp_id, thread_id, email_record, user_record, additional_info):
+    def __init__(self, rdp_id, thread_id, email_record, user_record):
         self.rdp_id = rdp_id
         self.thread_id = thread_id
         self.email_record = email_record

@@ -2,6 +2,8 @@
 import os
 import re
 import sys
+import json 
+from loguru import logger
 import random
 import asyncio
 import traceback
@@ -12,6 +14,12 @@ import aiohttp
 from db.base import get_supabase
 from db.tasks import TasksRepo
 from processors.wisley_login import WisleyLogin
+
+with open("config.json", "r", encoding="utf-8") as f:
+    cfg = json.load(f)
+for k, v in cfg.items():
+    os.environ[k] = str(v)
+    logger.debug(f"Loaded env var: {k}")
 
 CONFIG = {
     "POLL_INTERVAL": {"min": 1000, "max": 15000},  # ms

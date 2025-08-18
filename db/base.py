@@ -63,7 +63,8 @@ class BaseRepo:
 
     async def update(self, id_: int, data: Dict[str, Any]) -> Dict[str, Any]:
         data = {k: v for k, v in data.items() if k != "id"}
-        res = await self.sb.table(self.table).update(data).eq("id", id_).select("*").single().execute()
+        await self.sb.table(self.table).update(data).eq("id", id_).execute()
+        res = await self.sb.table(self.table).select("*").eq("id", id_).single().execute()
         return res.data
 
     async def delete(self, id_: int) -> None:
