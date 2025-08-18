@@ -224,8 +224,8 @@ def _build_balance_message(
     password: Optional[str],
     master_email: Optional[str],
     profile_id: Optional[str],
-    main_balance: float,
-    savings_balance: float,
+    main_balance: Union[float, str],
+    savings_balance: Union[float, str],
     raw_output: str,
 ) -> str:
     parts = [
@@ -234,8 +234,8 @@ def _build_balance_message(
         f"Password: {password}" if password else None,
         f"Master Email: {master_email}" if master_email else None,
         f"Profile ID: {profile_id}" if profile_id else None,
-        f"Main Balance: ${main_balance:.2f}",
-        f"Savings Balance: ${savings_balance:.2f}",
+        f"Main Balance: {main_balance}",  # Just convert to string
+        f"Savings Balance: {savings_balance}",  # Just convert to string
         f"Raw Output: {raw_output}"
     ]
     header = "\n".join(p for p in parts if p)
