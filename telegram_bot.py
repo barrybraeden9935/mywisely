@@ -202,11 +202,11 @@ def _parse_balances(output: Any) -> Dict[str, Any]:
 
     # main balance: "💸 Balance: $123.45" or "Balance: $123"
     main_match = re.search(r"(?:💸\s*)?Balance:\s*\$([\d,]+(?:\.\d{2})?)", text, re.I)
-    main_balance = float(main_match.group(1).replace(",", "")) if main_match else 0.0
+    main_balance = float(main_match.group(1).replace(",", "")) if main_match else "Failed to fetch balance"
 
     # savings: "Savings•••• 1234 $567.89" or "Savings $567.89"
     savings_match = re.search(r"Savings[^$]*\$\s*([\d,]+(?:\.\d{2})?)", text, re.I)
-    savings_balance = float(savings_match.group(1).replace(",", "")) if savings_match else 0.0
+    savings_balance = float(savings_match.group(1).replace(",", "")) if savings_match else "Failed to fetch balance"
 
     bad_status = bool(re.search(r"Bad\s*Status:\s*True", text, re.I))
 
@@ -236,6 +236,7 @@ def _build_balance_message(
         f"Profile ID: {profile_id}" if profile_id else None,
         f"Main Balance: ${main_balance:.2f}",
         f"Savings Balance: ${savings_balance:.2f}",
+        f"Raw Output: {raw_output}"
     ]
     header = "\n".join(p for p in parts if p)
 
@@ -415,7 +416,7 @@ async def on_startup(app):
         BotCommand("register_static", "Create REGISTER task from a static form"),
         BotCommand("ping", "Get ping")
     ])
-    # schedule cron every minute
+
     app.job_queue.run_repeating(cron_process_completed_tasks, interval=60, first=10)
     logger.info(
         f"Async Supabase client initialized, commands set, cron scheduled. "
@@ -427,7 +428,6 @@ async def get_balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Usage: /get_balance {email}")
         return
     email = context.args[0].strip()
-    # We still store the originating chat as message_id (optional), but cron posts to groups
     message_id = str(update.message.chat_id) if update.message else None
 
     sb: Client = context.application.bot_data["sb"]
