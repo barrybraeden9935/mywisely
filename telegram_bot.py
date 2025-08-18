@@ -4,7 +4,7 @@ import os
 import re
 import string
 import secrets
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 from loguru import logger
 from telegram import Update, BotCommand
