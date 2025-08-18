@@ -135,8 +135,8 @@ async def queue_balance_task(
     }
 
     payload = {
-        "task_type": "balance_check",
-        "status": "queued",
+        "task_type": "BALANCE_CHECK",
+        "status": "PENDING",
         "email": email,
         "message_id": message_id,
         "additional_data": additional_data,
@@ -181,7 +181,7 @@ async def queue_register_static(
 
         payload = {
             "task_type": "REGISTER",
-            "status": "queued",
+            "status": "PENDING",
             "email": selected_email,
             "message_id": message_id,
             "additional_data": additional_data,
