@@ -202,11 +202,11 @@ def _parse_balances(output: Any) -> Dict[str, Any]:
 
     # main balance: "💸 Balance: $123.45" or "Balance: $123"
     main_match = re.search(r"(?:💸\s*)?Balance:\s*\$([\d,]+(?:\.\d{2})?)", text, re.I)
-    main_balance = float(main_match.group(1).replace(",", "")) if main_match else "Failed to fetch balance"
+    main_balance = float(main_match.group(1).replace(",", "")) if main_match else 0.0
 
     # savings: "Savings•••• 1234 $567.89" or "Savings $567.89"
     savings_match = re.search(r"Savings[^$]*\$\s*([\d,]+(?:\.\d{2})?)", text, re.I)
-    savings_balance = float(savings_match.group(1).replace(",", "")) if savings_match else "Failed to fetch balance"
+    savings_balance = float(savings_match.group(1).replace(",", "")) if savings_match else 0.0
 
     bad_status = bool(re.search(r"Bad\s*Status:\s*True", text, re.I))
 
@@ -236,7 +236,6 @@ def _build_balance_message(
         f"Profile ID: {profile_id}" if profile_id else None,
         f"Main Balance: {main_balance}",  # Just convert to string
         f"Savings Balance: {savings_balance}",  # Just convert to string
-        f"Raw Output: {raw_output}"
     ]
     header = "\n".join(p for p in parts if p)
 
