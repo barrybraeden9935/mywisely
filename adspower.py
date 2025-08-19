@@ -2,6 +2,7 @@ import random
 import string
 import logging
 import time
+import json
 from typing import Dict, List, Optional, Any
 import requests
 from dataclasses import dataclass
@@ -75,15 +76,18 @@ class AdsPowerManager:
             logger.error(f"Request failed for {method} {url}: {e}")
             raise
 
-    def update_profile(self, profile_id: str) -> bool:
+    def update_profile(self, profile_id: str, open_urls: list = []) -> bool:
         try:
             data = {
-                "user_id": profile_id,
-                "proxy_id": "random"
+                "user_id": profile_id
             }
+
+            if len(open_urls) > 0:
+                data['open_urls'] = open_urls
             
+            print(data)
             response = self._make_request("POST", "/api/v1/user/update", data)
-            
+            print(response)
             if response.get("code") == 0:
                 logger.info(f"Successfully updated profile: {profile_id}")
                 return True
@@ -120,7 +124,7 @@ class AdsPowerManager:
     def create_profile(
         self, 
         proxy: Optional[ProxyConfig] = None, 
-        starting_url: str = "https://mygift.giftcardmall.com/#card"
+        starting_url: str = "https://www.mywisely.com"
     ) -> Optional[Dict]:
         try:
             if not proxy:
@@ -184,7 +188,9 @@ class AdsPowerManager:
             params = {
                 "user_id": profile_id,
                 "ip_tab": "0",
-                "launch_args": '["--start-maximized"]'
+                "launch_args": f'["--start-maximized"]',
+                "open_tabs": "1",
+
             }
             
             response = self._make_request("GET", "/api/v1/browser/start", params=params)

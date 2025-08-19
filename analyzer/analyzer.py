@@ -43,9 +43,9 @@ class Analyzer:
             element_count = len(elements)
             logger.debug(f"Attempt {attempt + 1}: Found {element_count} elements")
             
-            if element_count > 0:
+            if element_count <= 0:
                 logger.info(f"Attempt {attempt + 1}: Didn't find any  elements, need at least 1. Waiting...")
-                time.sleep(1)
+                time.sleep(5)
                 continue 
                 
             logger.success(f"Page loaded successfully with {element_count} elements detected")
@@ -54,44 +54,74 @@ class Analyzer:
         logger.error("Page failed to load after 10 attempts")
         return False 
     
-    def click_element_by_class(self, class_name, min_elements=5, expected_count=1):
-        logger.info(f"Attempting to click {class_name} element")
-        elements = self.detect_elements()
+    def click_element_by_class(self, class_name, min_elements=1, expected_count=1, max_attempts=3, wait_between_attempts=3.0):
+        logger.info(f"Attempting to click {class_name} element (max attempts: {max_attempts})")
         
-        if elements is None:
-            logger.error("Failed to detect any elements on page")
-            return "Failed to detect elements on page"
+        for attempt in range(max_attempts):
+            if max_attempts > 1:
+                logger.debug(f"Attempt {attempt + 1}/{max_attempts} for {class_name}")
             
-        element_count = len(elements)
-        logger.debug(f"Detected {element_count} elements on page")
-        
-        if element_count < min_elements:
-            logger.warning(f"Only found {element_count} elements, expected at least {min_elements}")
-            return f"Not all elements found on page (found {element_count}, expected at least {min_elements})"
+            elements = self.detect_elements()
             
-        # Log all detected elements for debugging
-        element_classes = [element['class_name'] for element in elements]
-        logger.debug(f"Detected element classes: {element_classes}")
+            if elements is None:
+                if attempt == max_attempts - 1:  # Last attempt
+                    logger.error("Failed to detect any elements on page")
+                    return "Failed to detect elements on page"
+                else:
+                    logger.warning(f"Attempt {attempt + 1}: Failed to detect elements, retrying in {wait_between_attempts}s")
+                    time.sleep(wait_between_attempts)
+                    continue
+                    
+            element_count = len(elements)
+            logger.debug(f"Detected {element_count} elements on page")
             
-        target_elements = [element for element in elements if element['class_name'] == class_name]
-        target_count = len(target_elements)
+            if element_count < min_elements:
+                if attempt == max_attempts - 1:  # Last attempt
+                    logger.warning(f"Only found {element_count} elements, expected at least {min_elements}")
+                    return f"Not all elements found on page (found {element_count}, expected at least {min_elements})"
+                else:
+                    logger.debug(f"Attempt {attempt + 1}: Only found {element_count} elements, retrying in {wait_between_attempts}s")
+                    time.sleep(wait_between_attempts)
+                    continue
+                    
+            # Log all detected elements for debugging
+            element_classes = [element['class_name'] for element in elements]
+            logger.debug(f"Detected element classes: {element_classes}")
+                
+            target_elements = [element for element in elements if element['class_name'] == class_name]
+            target_count = len(target_elements)
+            
+            logger.debug(f"Found {target_count} {class_name} elements")
+            
+            if target_count != expected_count:
+                if attempt == max_attempts - 1:  # Last attempt
+                    logger.error(f"Expected {expected_count} {class_name} element(s), found {target_count}")
+                    return f"Failed to find {class_name} element on page (found {target_count}, expected {expected_count})"
+                else:
+                    logger.debug(f"Attempt {attempt + 1}: Found {target_count} {class_name} elements, expected {expected_count}, retrying in {wait_between_attempts}s")
+                    time.sleep(wait_between_attempts)
+                    continue
+            
+            # Found the target element(s), proceed with click
+            target_element = target_elements[0]
+            logger.info(f"Found {class_name} element at center: {target_element['center']} (confidence: {target_element['confidence']:.3f})")
+            
+            success = self.click_element(target_element)
+            if success:
+                logger.success(f"Successfully clicked {class_name} element")
+                return f"Successfully clicked {class_name}"
+            else:
+                if attempt == max_attempts - 1:  # Last attempt
+                    logger.error(f"Failed to click {class_name} element")
+                    return f"Failed to click {class_name}"
+                else:
+                    logger.warning(f"Attempt {attempt + 1}: Failed to click {class_name}, retrying in {wait_between_attempts}s")
+                    time.sleep(wait_between_attempts)
+                    continue
         
-        logger.debug(f"Found {target_count} {class_name} elements")
-        
-        if target_count != expected_count:
-            logger.error(f"Expected {expected_count} {class_name} element(s), found {target_count}")
-            return f"Failed to find {class_name} element on page (found {target_count}, expected {expected_count})"
-
-        target_element = target_elements[0]
-        logger.info(f"Found {class_name} element at center: {target_element['center']} (confidence: {target_element['confidence']:.3f})")
-        
-        success = self.click_element(target_element)
-        if success:
-            logger.success(f"Successfully clicked {class_name} element")
-            return f"Successfully clicked {class_name}"
-        else:
-            logger.error(f"Failed to click {class_name} element")
-            return f"Failed to click {class_name}"
+        # This should never be reached, but just in case
+        logger.error(f"All {max_attempts} attempts failed for {class_name}")
+        return f"Failed to click {class_name} after {max_attempts} attempts"
 
     
     def click_element(self, element):
@@ -99,6 +129,9 @@ class Analyzer:
             center_x, center_y = element['center']
             class_name = element['class_name']
             confidence = element['confidence']
+
+            if class_name == 'USERNAME_INPUT' or class_name == 'PASSWORD_INPUT':
+                center_y = center_y + 30
             
             logger.info(f"Clicking {class_name} element (confidence: {confidence:.2f}) at coordinates ({center_x:.1f}, {center_y:.1f})")
             
@@ -199,6 +232,10 @@ class Analyzer:
                 confidence = box.conf[0].cpu().numpy()
                 class_id = int(box.cls[0].cpu().numpy())
                 class_name = self.model.names[class_id]
+
+                if confidence < 0.5:
+                    logger.debug(f"Detection {i+1}: {class_name} (confidence: {confidence:.3f} too low. Skipping)")
+                    continue
                 
                 detection = {
                     "class_name": class_name,
