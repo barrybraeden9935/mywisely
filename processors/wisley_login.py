@@ -4,6 +4,12 @@ import traceback
 from loguru import logger
 from adspower import AdsPowerManager
 from analyzer.analyzer import Analyzer
+from processors.gmail_manager import get2FACode
+
+import asyncio
+from playwright.async_api import async_playwright
+
+
 
 class WisleyLogin:
     def __init__(self, rdp_id, thread_id, email_record, user_record):
@@ -21,9 +27,10 @@ class WisleyLogin:
     def update_output(self, text):
         self.output += f"{text}\n"
 
-    def _login_internal(self):
+    async def _login_internal(self):
         """Internal login method that can raise exceptions"""
         try:
+            self.update_output("🔄 Starting login process...")
             logger.info(f"Starting login process for profile {self.profile_id}")
             
             # Update profile with login URL
@@ -40,6 +47,8 @@ class WisleyLogin:
             if not page_loaded:
                 logger.error("Login page failed to load")
                 raise Exception("Page failed to load")
+            
+            self.update_output("🔄 Filling step 1 (filling email and password)...")
             
             # Click initial login button (if present)
             logger.debug("Attempting to click initial login button")
@@ -97,41 +106,91 @@ class WisleyLogin:
                 return False
             logger.debug("Successfully clicked 2FA button")
 
-            # Click 2FA code input field
-            logger.debug("Clicking 2FA code input field")
-            twofa_input_clicked = self.analyzer.click_element_by_class('2FA_CODE_INPUT')
-            if not twofa_input_clicked:
-                logger.error("Failed to click 2FA code input field")
-                return False
-            logger.debug("Successfully clicked 2FA code input field")
-            
-            # Type 2FA code
-            logger.debug("Typing 2FA code")
-            twofa_code = ""
-            twofa_code_typed = self.analyzer.type_text_random(twofa_code)
-            if not twofa_code_typed:
-                logger.error("Failed to type 2FA code")
-                return False
-            logger.debug("Successfully typed 2FA code")
+            twofa_elements =  self.analyzer.detect_elements(0.8)
+            needs_twofa = len(twofa_elements) >= 2
 
-            # Click submit 2FA button
-            logger.debug("Clicking submit 2FA button")
-            submit_twofa_clicked = self.analyzer.click_element_by_class('SUBMIT_2FA_BUTTON')
-            if not submit_twofa_clicked:
-                logger.error("Failed to click submit 2FA button")
-                return False
-            logger.debug("Successfully clicked submit 2FA button")
-            
+            if needs_twofa:
+                self.update_output("🔄 Filling step 2 (filling 2fa)...")
+                
+                # success, twofa_code = get2FACode(os.environ['GMAIL_API'], self.email_record['email'], 
+                #     self.thread_id, self.email_record['master_email'], self.rdp_id
+                # )
+
+                # if not success:
+                #     logger.error(f"Failed to fetch 2FA code from gmail API - {twofa_code}")
+                #     return False
+
+                twofa_code = input("Enter code:")
+                # Click 2FA code input field
+                logger.debug("Clicking 2FA code input field")
+                twofa_input_clicked = self.analyzer.click_element_by_class('2FA_CODE_INPUT')
+                if not twofa_input_clicked:
+                    logger.error("Failed to click 2FA code input field")
+                    return False
+                logger.debug("Successfully clicked 2FA code input field")
+                
+                # Type 2FA code
+                logger.debug("Typing 2FA code")
+                twofa_code_typed = self.analyzer.type_text_random(twofa_code)
+                if not twofa_code_typed:
+                    logger.error("Failed to type 2FA code")
+                    return False
+                logger.debug("Successfully typed 2FA code")
+
+                # Click submit 2FA button
+                logger.debug("Clicking submit 2FA button")
+                submit_twofa_clicked = self.analyzer.click_element_by_class('SUBMIT_2FA_BUTTON')
+                if not submit_twofa_clicked:
+                    logger.error("Failed to click submit 2FA button")
+                    return False
+                logger.debug("Successfully clicked submit 2FA button")
+            else:
+                self.update_output("✉️ 2FA not required")
+                
             logger.success(f"Login process completed successfully for profile {self.profile_id}")
+
+            self.update_output("🔄 Getting balance...")
+            main_balance, savings_balance = await self.get_balance_info_async(self.browser_info.ws['puppeteer'])
+            self.update_output(f"💸 Balance: {main_balance}")
+            self.update_output(f"💸 Savings balance: {savings_balance}")
             return True
             
         except Exception as e:
             logger.error(f"Login process failed with exception: {str(e)}")
             raise
-        
-    def login(self):
+
+    async def connect_browser(self, playwright_ws: str):
         try:
-            self._login_internal()
+            playwright = await async_playwright().start()
+            browser = await playwright.chromium.connect_over_cdp(playwright_ws)
+            context = browser.contexts[0] if browser.contexts else await browser.new_context()
+            page = context.pages[0] if context.pages else await context.new_page()
+            
+            return browser, page, playwright
+            
+        except Exception as e:
+            print(f"Failed to connect to browser: {e}")
+            raise
+
+    async def get_balance_info_async(self, playwright_ws: str):
+        browser, page, playwright = await self.connect_browser(playwright_ws)
+        
+        try:
+            main_balance_text = await page.locator('[data-e2eauto="balance"]').inner_text()
+            
+            await page.goto("https://www.mywisely.com/app/main/future")
+            savings_text = await page.locator('[data-e2eauto="totalEnvelopeSavingsCurrency"]').inner_text()
+            
+            return main_balance_text, savings_text
+            
+        finally:
+            await browser.close()
+            await playwright.stop()
+
+    async def login(self):
+        try:
+            await self._login_internal()
+            return self.output
         except Exception as e:
             # Capture the full traceback
             error_details = traceback.format_exc()

@@ -128,10 +128,10 @@ async def _process_balance_task(tasks_repo: TasksRepo, task: Dict[str, Any], rdp
     user_record = ad.get("user_record")
 
     wl = WisleyLogin(rdp_id, thread_id, email_record, user_record)
-    output = wl.login()
+    output = await wl.login()
     output_json = {"output": output}
 
-    # await tasks_repo.update(task["id"], {"status": "COMPLETED", "output": output_json})
+    await tasks_repo.update(task["id"], {"status": "COMPLETED", "output": output_json})
 
 # If/when you wire REGISTER in this worker, make it follow the same shapes as bot.py:
 # - task_type: "REGISTER"

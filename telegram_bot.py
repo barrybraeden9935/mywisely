@@ -1,5 +1,8 @@
 # bot.py
 import json
+import ast
+from typing import Optional, Union
+
 import os
 import re
 import string
@@ -226,7 +229,7 @@ def _build_balance_message(
     profile_id: Optional[str],
     main_balance: Union[float, str],
     savings_balance: Union[float, str],
-    raw_output: str,
+    raw_output: Union[str, dict],
 ) -> str:
     parts = [
         f"Email: {email}",
@@ -234,17 +237,37 @@ def _build_balance_message(
         f"Password: {password}" if password else None,
         f"Master Email: {master_email}" if master_email else None,
         f"Profile ID: {profile_id}" if profile_id else None,
-        f"Main Balance: {main_balance}",  # Just convert to string
-        f"Savings Balance: {savings_balance}",  # Just convert to string
     ]
     header = "\n".join(p for p in parts if p)
 
-    tail = ""
-    if raw_output:
-        trimmed = raw_output if len(raw_output) <= 1800 else raw_output[:1800] + "…"
-        tail = f"\n\n--- Raw Output ---\n{trimmed}"
+    # keep your debug print
+    print(raw_output)
 
-    return header + tail
+    tail = ""
+    if isinstance(raw_output, dict):
+        tail = raw_output.get("output") or raw_output.get("ouput") or ""
+    elif isinstance(raw_output, str):
+        s = raw_output.strip()
+        parsed = None
+        # Try proper JSON first
+        try:
+            parsed = json.loads(s)
+        except json.JSONDecodeError:
+            # Try Python literal (handles "{'output': '...'}")
+            try:
+                parsed = ast.literal_eval(s)
+            except Exception:
+                parsed = None
+        if isinstance(parsed, dict):
+            tail = parsed.get("output") or parsed.get("ouput") or ""
+        else:
+            # If it's just a plain string, use it as-is
+            tail = s
+    else:
+        tail = str(raw_output)
+
+    # Ensure a clean join
+    return f"{header}\n\n{tail}".rstrip()
 
 def _register_successful(output: Any) -> bool:
     text = "" if output is None else str(output)

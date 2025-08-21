@@ -203,7 +203,7 @@ class Analyzer:
             logger.error(f"Error taking screenshot: {e}")
             return None
 
-    def detect_elements(self):
+    def detect_elements(self, confidence_req = 0.5):
         logger.debug("Starting element detection")
         screenshot = self.screenshot()
         if screenshot is None:
@@ -233,7 +233,7 @@ class Analyzer:
                 class_id = int(box.cls[0].cpu().numpy())
                 class_name = self.model.names[class_id]
 
-                if confidence < 0.5:
+                if confidence < confidence_req:
                     logger.debug(f"Detection {i+1}: {class_name} (confidence: {confidence:.3f} too low. Skipping)")
                     continue
                 

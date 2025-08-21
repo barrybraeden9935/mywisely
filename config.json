@@ -4,6 +4,7 @@
     "SUPABASE_URL": "https://zgyujpempceyxpkzcvok.supabase.co",
     "SUPABASE_SERVICE_ROLE_KEY": "sb_secret_vF9JjAebAgqhb5GKIW4ntA_8QrLSPxB",
     "MAIN_GROUP_CHAT_ID": "-4823975367",
-    "TRANSFERS_GROUP_CHAT_ID": "-4686276375"
+    "TRANSFERS_GROUP_CHAT_ID": "-4686276375",
+    "GMAIL_API":"http://localhost:3000"
 }
 
