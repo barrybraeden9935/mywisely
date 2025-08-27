@@ -12,13 +12,14 @@ from playwright.async_api import async_playwright
 
 
 class WisleyLogin:
-    def __init__(self, rdp_id, thread_id, email_record, user_record):
+    def __init__(self, task_repo, rdp_id, thread_id, email_record, user_record):
         self.rdp_id = rdp_id
         self.thread_id = thread_id
         self.email_record = email_record
         self.user_record = user_record
         self.profile_id = self.email_record.get('profile_id')
         self.output = ""
+        self.task_repo = task_repo
         if not self.profile_id:
             raise Exception(f"No profile ID found for email row {self.email_record}")
         self.adspower = AdsPowerManager()
@@ -112,15 +113,14 @@ class WisleyLogin:
             if needs_twofa:
                 self.update_output("🔄 Filling step 2 (filling 2fa)...")
                 
-                # success, twofa_code = get2FACode(os.environ['GMAIL_API'], self.email_record['email'], 
-                #     self.thread_id, self.email_record['master_email'], self.rdp_id
-                # )
+                success, twofa_code = await get2FACode(self.task_repo, self.email_record['email'], 
+                    self.thread_id, self.email_record['master_email'], self.rdp_id
+                )
 
-                # if not success:
-                #     logger.error(f"Failed to fetch 2FA code from gmail API - {twofa_code}")
-                #     return False
+                if not success:
+                    logger.error(f"Failed to fetch 2FA code from gmail API - {twofa_code}")
+                    return False
 
-                twofa_code = input("Enter code:")
                 # Click 2FA code input field
                 logger.debug("Clicking 2FA code input field")
                 twofa_input_clicked = self.analyzer.click_element_by_class('2FA_CODE_INPUT')
@@ -184,8 +184,7 @@ class WisleyLogin:
             return main_balance_text, savings_text
             
         finally:
-            await browser.close()
-            await playwright.stop()
+            self.adspower.close_browser(self.profile_id)
 
     async def login(self):
         try:

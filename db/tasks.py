@@ -42,11 +42,17 @@ class TasksRepo(BaseRepo):
             self.sb.table(self.table)
             .select("*")
             .eq("status", "COMPLETED")
+            .neq("task_type", 'TWOFA')
             .order("created_at", desc=False)
             .limit(limit)
         )
         res = await q.execute()
+        print(res.data)
         return res.data or []
 
     async def delete_by_id(self, id_: int) -> None:
         await self.sb.table(self.table).delete().eq("id", id_).execute()
+
+    async def get_task_by_id(self, id: int) -> dict[str, Any]:
+        res = await self.sb.table(self.table).select("*").eq("id", id).execute()
+        return res.data or {}

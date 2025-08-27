@@ -19,11 +19,14 @@ class BaseRepo:
 
     # ---------- Generic CRUD (async) ----------
     async def create(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        res = await self.sb.table(self.table).insert(data).select("*").single().execute()
-        return res.data
+        res = await self.sb.table(self.table).insert(data).execute()
+        # Get the inserted record ID and fetch it
+        inserted_id = res.data[0]['id']  # Assuming 'id' is your primary key
+        result = await self.sb.table(self.table).select("*").eq('id', inserted_id).single().execute()
+        return result.data
 
     async def bulk_create(self, rows: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        res = await self.sb.table(self.table).insert(list(rows)).select("*").execute()
+        res = await self.sb.table(self.table).insert(list(rows)).execute()
         return res.data or []
 
     async def get_by_id(self, id_: int) -> Optional[Dict[str, Any]]:

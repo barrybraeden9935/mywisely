@@ -127,7 +127,7 @@ async def _process_balance_task(tasks_repo: TasksRepo, task: Dict[str, Any], rdp
     email_record = ad.get("email_record") 
     user_record = ad.get("user_record")
 
-    wl = WisleyLogin(rdp_id, thread_id, email_record, user_record)
+    wl = WisleyLogin(tasks_repo, rdp_id, thread_id, email_record, user_record)
     output = await wl.login()
     output_json = {"output": output}
 

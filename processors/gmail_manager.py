@@ -1,49 +1,44 @@
-import requests
-import json
 import time
 import traceback
 
-def get2FACode(api_prefix, email_address, thread_id, master_email, rdp_id):
+async def get2FACode(task_repo, email_address, thread_id, master_email, rdp_id):
     try:
-        # Initial search request
-        search_payload = {
-            'emailAddress': email_address,
-            'threadID': thread_id,
-            'masterEmail': master_email,
-            'rdpID': rdp_id,
-            'service': 'wisley_login'
+        additional_data = {
+            "rdp_id": rdp_id,
+            "thread_id": thread_id,
+            "master_email": master_email,
+            "service": "wisley_login"
         }
         
-        search_resp = requests.post(
-            f"{api_prefix}/search2FA",
-            headers={'Content-Type': 'application/json'},
-            data=json.dumps(search_payload)
-        )
-        
-        print(search_resp.json())
-        
-        # Set timeout to 3 minutes (60 seconds * 3)
         timeout = time.time() + 60 * 3
-        
+        task_info = await task_repo.create_task("TWOFA", additional_data, 'PENDING', None, email_address, {})
+
         while time.time() < timeout:
-            response = requests.post(
-                f"{api_prefix}/get2FA",
-                headers={'Content-Type': 'application/json'},
-                data=json.dumps({'emailAddress': email_address})
-            )
+            task_details = await task_repo.get_task_by_id(task_info['id'])
+            task_details = task_details[0]
             
-            if response.ok:
-                data = response.json()
-                print(data)
-                if data['status'] != 'PENDING':
-                    success = data['status'] != 'ERROR'
-                    return success, data['code']
+            if task_details['status'] != 'COMPLETED':
+                time.sleep(5)
+                continue
+
+            output = task_details.get("output")
+            if not output:
+                await task_repo.delete_by_id(task_info['id'])
+                return False, f"No task found with id {task_info['id']}"
+
+            print(output)
+            success = output.get("success")
+            code = output.get("code")
+            if str(success).lower() != 'true':
+                await task_repo.delete_by_id(task_info['id'])
+                return False, f"Failed to get 2FA code with output {code}"
             
-            # Wait 2 seconds before next attempt
-            time.sleep(2)
+            await task_repo.delete_by_id(task_info['id'])
+            return True, code
         
+        await task_repo.delete_by_id(task_info['id'])
         return False, "Timeout waiting for 2FA code"
         
     except Exception as error:
-        print(e)
+        print(traceback.format_exc())
         return False, traceback.format_exc()

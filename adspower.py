@@ -215,10 +215,10 @@ class AdsPowerManager:
         try:
             if profile_id not in self.active_browsers:
                 logger.warning(f"No active browser found for profile: {profile_id}")
-                return False
+                return Falses
 
-            data = {"user_id": profile_id}
-            response = self._make_request("POST", "/api/v1/browser/stop", data)
+            params = {"user_id": profile_id}
+            response = self._make_request("GET", "/api/v1/browser/stop", None, params)
             
             if response.get("code") == 0:
                 del self.active_browsers[profile_id]

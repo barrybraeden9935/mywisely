@@ -5,6 +5,6 @@
     "SUPABASE_SERVICE_ROLE_KEY": "sb_secret_vF9JjAebAgqhb5GKIW4ntA_8QrLSPxB",
     "MAIN_GROUP_CHAT_ID": "-4823975367",
     "TRANSFERS_GROUP_CHAT_ID": "-4686276375",
-    "GMAIL_API":"http://localhost:3000"
+    "GMAIL_API":"https://c03e16ab7a6c.ngrok-free.app"
 }
 
